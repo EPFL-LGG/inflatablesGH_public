@@ -1,0 +1,75 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Python cache and notebook stuff
+__pycache__
+.ipynb_checkpoints
+.cache
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Mesh files
+*.obj
+*.off
+*.ply
+*.msh
+*.mesh
+*.vtk
+
+# Extra directories
+.vscode/
+.idea/
+/build
+/build2
+/build_debug
+/cmake-build-*
+/data
+
+# Clangd completion files
+.clangd/
+compile_commands.json
+
+# Non-submodule dependencies
+/3rdparty/Catch2/
+/3rdparty/eigen/
+/3rdparty/json/
+/3rdparty/optional/
+/3rdparty/pybind11/
+/3rdparty/spectra/
+/3rdparty/tbb/
+/3rdparty/tinyexpr/
+/3rdparty/triangle/
+
+# Mac/ntfs garbage
+.DS_Store
+.nfs*
+
+# Auto-generated python stuff
+python/MeshFEM/__init__.py

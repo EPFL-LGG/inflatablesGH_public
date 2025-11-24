@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Inflatables Report 10/4/2019</title>
+  <style type="text/css">
+      code{white-space: pre-wrap;}
+      span.smallcaps{font-variant: small-caps;}
+      span.underline{text-decoration: underline;}
+      div.column{display: inline-block; vertical-align: top; width: 50%;}
+  </style>
+  <link rel="stylesheet" href="icg_report.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+</head>
+<body>
+<header>
+<h1 class="title">Inflatables Report 10/4/2019</h1>
+</header>
+<p>The design pipeline that we currently envision consists of the following steps:</p>
+<ol type="1">
+<li>Parametrization: flatten the target 3D surface to the plane with a mapping that stretches the surface by <span class="math inline">\(\alpha_\text{min} \le \alpha \le \frac{\pi}{2}\)</span> along one direction and leaves the orthogonal direction unstretched. This is so that the <em>inverse mapping</em> from the plane to the target surface contracts lengths by <span class="math inline">\(\frac{2}{\pi}\)</span> just like the air channel mechanism.</li>
+<li>Trace air channel walls along the unstretched direction field with thickness determined by the value of <span class="math inline">\(\alpha\)</span> at each point.</li>
+<li>Simulate the inflation of these air channels (and build atop this simulation an optimization of the wall curves to better fit the inflated structure to the target surface).</li>
+</ol>
+<p>So far, I have been working primarily on stages 1 and 3, and this document provides an update on my progress.</p>
+<h2 id="parametrization">Parametrization</h2>
+<h3 id="formulation">Formulation</h3>
+<p>We seek a mapping <span class="math inline">\(f : \mathcal{M} \to \mathbb{R}^2\)</span> of a target surface <span class="math inline">\(\mathcal{M} \subset \mathbb{R}^3\)</span> to the plane that is “compatible” with the air channel inflation mechanism. The most obvious requirement on <span class="math inline">\(f\)</span> can be expressed in terms of the singular value decomposition of its Jacobian at each point on the surface: <span class="math display">\[
+    \nabla f = U
+    \begin{pmatrix}
+        \sigma_0 &amp; 0 &amp; 0 \\
+        0 &amp; \sigma_1 &amp; 0
+    \end{pmatrix}
+    V^T,
+\label{eqn:svd}\tag{1}
+\]</span> where <span class="math inline">\(U \in \mathbb{R}^{2 \times 2}\)</span> is a matrix whose two columns give the directions <em>in the plane</em> along which lengths are stretched or preserved respectively, <span class="math inline">\(\sigma_0\)</span> and <span class="math inline">\(\sigma_1\)</span> are the stretching amounts along these directions, and <span class="math inline">\(V \in \mathbb{R}^{3 \times 3}\)</span> indicates the directions in 3D space that are stretched by the mapping (we do not care so much about <span class="math inline">\(V\)</span>).</p>
+<p>To be compatible with the air channel mechanism, <span class="math inline">\(f\)</span> must have <span class="math inline">\(\sigma_1 = 1\)</span> and <span class="math inline">\(\sigma_0\)</span> in some admissible stretching range <span class="math inline">\(\left[\alpha_\text{min}, \frac{\pi}{2}\right]\)</span>. Setting <span class="math inline">\(\alpha_\text{min} = \frac{\pi}{2}\)</span> would mean all air channels are of “full width,” while choosing <span class="math inline">\(\alpha_\text{min} \in \left(1, \frac{\pi}{2}\right)\)</span> means the air channels are allowed to be narrower than the air channel spacing (so a band of fused material fits between each channel). It appears that allowing <span class="math inline">\(\alpha_\text{min} \lt \frac{\pi}{2}\)</span> enables significantly more flexibility in the space of surfaces that can be flattened.</p>
+<p>Mappings of this form were already constructed in <span class="citation" data-cites="aharoni">Aharoni et al. (2018)</span>, which ran an iterative “local-global” optimization to fit <span class="math inline">\(\nabla f\)</span> to the desired form by minimizing the energy: <span class="math display">\[
+E[f] :=
+\min_{U, V, \alpha} \frac{1}{2} \int_\mathcal{M} \! \left\| \nabla f -
+    U
+    \begin{pmatrix}
+        \alpha &amp; 0 &amp; 0 \\
+        0 &amp; 1 &amp; 0
+    \end{pmatrix}
+    V^T
+ \right\|_F^2 \ \mathrm{d}A.
+\label{eqn:lgparam}\tag{2}
+\]</span> Their approach alternates between (i) computing a closed-form solution to the minimization over <span class="math inline">\(U\)</span>, <span class="math inline">\(V\)</span> and <span class="math inline">\(\alpha\)</span> (found by computing the SVD of the current Jacobian <span class="math inline">\(\nabla f\)</span> for each triangle and setting <span class="math inline">\(\alpha\)</span> to <span class="math inline">\(\sigma_0\)</span> clamped to the admissible range); and (ii) solving for the optimal mapping <span class="math inline">\(f\)</span> while holding the newly computed <span class="math inline">\(U\)</span>, <span class="math inline">\(V\)</span> and <span class="math inline">\(\alpha\)</span> fixed. As long as this method is run from a reasonable initialization, it quickly reaches a parametrization <span class="math inline">\(f\)</span> with singular values close to the admissible range (provided such a mapping exists).</p>
+<p>Unfortunately, as seen in the following figure, this approach results in noisy “stretch factors” <span class="math inline">\(\alpha\)</span> and orientations that would be difficult to trace air channels through:</p>
+<figure>
+<img src="images/LocalGlobalLiliumPlot.png" alt="Figure 1: Result of local-global optimization (\ref{eqn:lgparam}) with \alpha_\text{min} = 1.4 on the Lilium tower surface." /><figcaption>Figure 1: Result of local-global optimization <span class="math inline">\((\ref{eqn:lgparam})\)</span> with <span class="math inline">\(\alpha_\text{min} = 1.4\)</span> on the Lilium tower surface.</figcaption>
+</figure>
+<p>Here, the orientations are visualized by taking the angle between the stretching direction and the plane’s <span class="math inline">\(x\)</span> axis and interpreting it is a hue in the HSV color space (actually, we visualize twice this angle because rotating a stretching direction by <span class="math inline">\(\pi\)</span> gives the same channel orientation).</p>
+<p>To encourage more structure in the stretching factor and orientation fields, we need to add some regularization terms to <span class="math inline">\((\ref{eqn:lgparam})\)</span>. After adding these terms, we will no longer be able to use the local-global optimization approach of solving for optimal <span class="math inline">\(U, \alpha,\)</span> and <span class="math inline">\(V\)</span> in closed form (for fixed <span class="math inline">\(f\)</span>). We instead must directly tackle the nonlinear optimization problem of minimizing the mapping energy: <span class="math display">\[
+E[f] := \underbrace{\frac{1}{2} \int_\mathcal{M}
+                    (\sigma_1 - 1)^2 + \left(\sigma_0 - \texttt{clamp}(\sigma_0, (\alpha_\text{min}, \pi / 2))\right)^2 \mathrm{d}A
+        }_{\text{singular value fitting term}}
+      + \underbrace{
+            \frac{w_\phi}{p_\phi} \sum_{i, j} \sin(|\phi_i - \phi_j|)^{p_\phi}
+        }_{\text{direction regularization}}
+      + \underbrace{
+            \frac{w_\alpha}{p_\alpha} \sum_{i, j} |\alpha_i  - \alpha_j|^{p_\alpha}
+        }_{\text{stretch regularization}},
+\label{eqn:rparam}\tag{3}
+\]</span> where the sums in the regularization terms are over the mesh edges (indexed by adjacent triangles <span class="math inline">\(i\)</span> and <span class="math inline">\(j\)</span>). These regularization terms are expressed in terms of functions of (the SVD of) Jacobian <span class="math inline">\(\nabla f\)</span> on triangles <span class="math inline">\(i\)</span> and <span class="math inline">\(j\)</span>: we’ve defined <span class="math inline">\(\alpha_i\)</span> to be triangle <span class="math inline">\(i\)</span>’s largest singular value (<span class="math inline">\(\sigma_0\)</span>) and <span class="math inline">\(\phi_i\)</span> to be the angle between the corresponding left singular vector (i.e., the first column of <span class="math inline">\(U\)</span> in <span class="math inline">\((\ref{eqn:svd})\)</span>) and the <span class="math inline">\(x\)</span> axis. The direction regularization term can also be written in the equivalent form: <span class="math display">\[
+  \frac{w_\phi}{p_\phi} \sum_{i, j} \|{\bf u}_i \times {\bf u}_j\|^{p_\phi},
+\]</span> where <span class="math inline">\({\bf u}_i\)</span> and <span class="math inline">\({\bf u}_j\)</span> are first left singular vectors for triangles <span class="math inline">\(i\)</span> and <span class="math inline">\(j\)</span>.</p>
+<p>Weights <span class="math inline">\(w_\phi\)</span> and <span class="math inline">\(w_\alpha\)</span> control the trade-off between preferring smoothness in the corresponding fields and fitting to the admissible singular values. Parameters <span class="math inline">\(p_\phi\)</span> and <span class="math inline">\(p_\alpha\)</span> control the type of smoothness/structure we ask for. For instance, setting <span class="math inline">\(p_\phi = 2\)</span> requests that stretching orientations vary smoothly across the surface, while <span class="math inline">\(p_\phi = 1\)</span> requests more of a “zig-zagging” map with patches of nearly straight air channels that abruptly change direction across a sparse network of seams.</p>
+<h3 id="parametrization-results">Parametrization Results</h3>
+The results shown here are for the “Lilium Tower” surface mesh, which has a mixture of negative and positive curvature:
+<center>
+<img src="images/lilium_surface.png" width="500" />
+</center>
+<h4 id="local-global-parametrization-alpha_textmin-1.4">Local-Global Parametrization, <span class="math inline">\(\alpha_\text{min} = 1.4\)</span></h4>
+<p>The following results use <span class="math inline">\(\alpha_\text{min} = 1.4\)</span> (corresponding to a minimum channel width of ~70% of the channel spacing). The result from the unregularized, local-global alternating minimization <span class="math inline">\((\ref{eqn:lgparam})\)</span> were already shown in Figure 1 above, but I repeat them here, this time adding a quiver plot visualization of the orientations and a histogram of the singular values:</p>
+<p><a href="images/LocalGlobalLiliumPlot.png" target=".blank"><img src="images/LocalGlobalLiliumPlot.png" width="800" /></a> <a href="images/lilium_local_global_quiver.png" target=".blank"><img src="images/lilium_local_global_quiver.png" width="400" /></a> <a href="images/lilium_local_global_histogram.png" target=".blank"><img src="images/lilium_local_global_histogram.png" width="400" /></a></p>
+<p>(Click for larger images.) As the histogram shows, the singular values mostly fit to their target values, though we see a considerable number of triangles with singular values less than <span class="math inline">\(1.4\)</span> or greater than <span class="math inline">\(\frac{\pi}{2} \approx 1.508\)</span>. The min/max statistics for the singular values are:</p>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>min</th>
+<th>max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(\sigma_0\)</span></td>
+<td>1.3495</td>
+<td>1.6045</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\sigma_1\)</span></td>
+<td>0.9347</td>
+<td>1.0523</td>
+</tr>
+</tbody>
+</table>
+<h4 id="regularized-parametrization-alpha_textmin-1.4">Regularized Parametrization, <span class="math inline">\(\alpha_\text{min} = 1.4\)</span></h4>
+<p>Running the regularized parametrization <span class="math inline">\((\ref{eqn:rparam})\)</span>with <span class="math inline">\(p_\phi = p_\alpha = 2\)</span> to prefer smooth fields and using weights <span class="math inline">\(w_\alpha = 10^{-5}, w_\phi = 5\times 10^{-6}\)</span> yields a much smoother orientation field and actually better satisfaction of the stretching bounds:</p>
+<p><a href="images/lilium_rparam_plot.png" target=".blank"><img src="images/lilium_rparam_plot.png" width="800" /></a> <a href="images/lilium_rparam_quiver.png" target=".blank"><img src="images/lilium_rparam_quiver.png" width="400" /></a> <a href="images/lilium_rparam_histogram.png" target=".blank"><img src="images/lilium_rparam_histogram.png" width="400" /></a></p>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>min</th>
+<th>max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(\sigma_0\)</span></td>
+<td>1.3987</td>
+<td>1.5721</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\sigma_1\)</span></td>
+<td>0.9860</td>
+<td>1.0160</td>
+</tr>
+</tbody>
+</table>
+<h4 id="regularized-parametrization-alpha_textmin-fracpi2">Regularized Parametrization, <span class="math inline">\(\alpha_\text{min} = \frac{\pi}{2}\)</span></h4>
+<p>If we prohibit the channel width from varying (setting <span class="math inline">\(\alpha_\text{min} = \frac{\pi}{2}\)</span>), we get the following results:</p>
+<p><a href="images/lilium_rparam_alphamin_pi_2_plot.png" target=".blank"><img src="images/lilium_rparam_alphamin_pi_2_plot.png" width="800" /></a> <a href="images/lilium_rparam_alphamin_pi_2_quiver.png" target=".blank"><img src="images/lilium_rparam_alphamin_pi_2_quiver.png" width="400" /></a> <a href="images/lilium_rparam_alphamin_pi_2_histogram.png" target=".blank"><img src="images/lilium_rparam_alphamin_pi_2_histogram.png" width="400" /></a></p>
+<p>The orientation field has sharper transitions, and we no longer fit the requested stretching values as closely:</p>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>min</th>
+<th>max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(\sigma_0\)</span></td>
+<td>1.5298</td>
+<td>1.6444</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\sigma_1\)</span></td>
+<td>0.9135</td>
+<td>1.0523</td>
+</tr>
+</tbody>
+</table>
+<h2 id="inflation-simulation">Inflation Simulation</h2>
+<p>On the simulation side, I have implemented the approach described in <a href="http://www-labs.iro.umontreal.ca/~bernhard/PDF/InflatableStructures.pdf"><span class="citation" data-cites="Skouras2014">(Skouras et al. 2014)</span></a>, which models the sheets as incompressible neo-Hookean membranes with no bending stiffness. My implementation supports enabling and disabling the Tension-field Theory approximation (where compressive forces are neglected to avoid the numerical challenges involved in resolving local sheet buckling/crinkling).</p>
+<p>When the pressure is high enough for the true equilibrium to have tension almost everywhere, Tension-field Theory gives essentially identical results to the full neo-Hookean simulation while converging significantly faster. For lower pressures, Tension-field Theory can give weird results with highly compressed/inverted regions (since compression is not penalized).</p>
+<p>I have run a few experiments so far on some simple parametric designs to validate the simulation:</p>
+<h3 id="square-sheets-with-vertical-channels">Square Sheets with Vertical Channels</h3>
+(Click the videos to play/pause.)
+<center>
+<video height="400px" width="600px" loop onclick="this.paused ? this.play() : this.pause();" loop playsinline controls>
+<source src="videos/square_pillow.mp4" type="video/mp4">
+</video>
+</center>
+<center>
+<video height="400px" width="600px" loop onclick="this.paused ? this.play() : this.pause();" loop playsinline controls>
+<source src="videos/square_pillow_8_channels.mp4" type="video/mp4">
+Video not working… </video>
+</center>
+<p>As expected, the sheets contract in the direction perpendicular to the channels, but then somewhat surprisingly, they roll up (note: my simulation does not detect/avoid collisions). This can be explained by the fact that the channel sidewalls prefer to contract into mildly concave shapes, which is only possible if the channels roll out of plane. I would be interested to see if this rolling effect is seen in physical experiments–have you tried this experiment?</p>
+<h3 id="concentric-circles">Concentric Circles</h3>
+<center>
+<video height="400px" width="600px" loop playsinline controls>
+<source src="videos/hyperbolic_disk.mp4" type="video/mp4">
+</video>
+</center>
+<p>This experiment eventually worked as expected, although initially I was not setting a high enough pressure, which caused the Tension-field based simulation to give non-physical results. Is there a rule of thumb we can use for predicting the inflation pressure needed?</p>
+You’ll notice that after the structure appears to have fully inflated, the saddle orientation still rotates for a while; during this stage, the simulation is able to very slightly increase the volume. My interpretation is that, even though the rotationally symmetric design does not prefer any particular saddle orientation, my surface triangulation does have a slight asymmetry which the simulation is exploiting:
+<center>
+<img src="images/concentric_circles_mesh.png" width="300" />
+</center>
+<p>(The blue circles indicate the vertices at which the top and bottom sheets are fused together.)</p>
+<h3 id="radial-channels">Radial Channels</h3>
+I also tried a design with straight radial walls, which I expected to contract into a cone:
+<center>
+<img src="images/radial_channels_mesh.png" width="400" />
+</center>
+That is not quite what happened. Depending on the applied pressure, either the sheet buckled in to a configuration with a crease at each wall density transition or into a folded mess (that was at least closer to what I expected): <a name="kinks"></a>
+<center>
+<img src="images/radial_channels_kinked_cone.png" width="400" /> <img src="images/radial_channels_crinkled_cone.png" width="300" />
+</center>
+<p>I am wondering if a bending energy term is needed to avoid configurations like the one on the left–or maybe this actually a valid equilibrium? Could it be realized in practice?</p>
+<h2 id="references" class="unnumbered">References</h2>
+<div id="refs" class="references">
+<div id="ref-aharoni">
+<p>Aharoni, Hillel, Yu Xia, Xinyue Zhang, and Shu Kamien Randall D. andYang. 2018. “Universal Inverse Design of Surfaces with Thin Nematic Elastomer Sheets.” <em>Proceedings of the National Academy of Sciences of the United States of America</em> 115 (28).</p>
+</div>
+<div id="ref-Skouras2014">
+<p>Skouras, Mélina, Bernhard Thomaszewski, Peter Kaufmann, Akash Garg, Bernd Bickel, Eitan Grinspun, and Markus Gross. 2014. “Designing Inflatable Structures.” <em>ACM Trans. Graph.</em> 33 (4). New York, NY, USA: ACM: 63:1–63:10. <a href="https://doi.org/10.1145/2601097.2601166" class="uri">https://doi.org/10.1145/2601097.2601166</a>.</p>
+</div>
+</div>
+</body>
+</html>

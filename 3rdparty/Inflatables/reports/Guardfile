@@ -1,0 +1,9 @@
+guard 'livereload' do
+    watch(%r{.+\.html$})
+end
+
+guard 'shell' do
+    watch(%r{.+\.md$}) do |m|
+        `make`
+    end
+end

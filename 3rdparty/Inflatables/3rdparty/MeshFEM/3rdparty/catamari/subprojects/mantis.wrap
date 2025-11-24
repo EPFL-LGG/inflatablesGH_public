@@ -1,0 +1,5 @@
+[wrap-git]
+directory = mantis
+url = https://github.com/jpanetta/mantis.git
+revision = b238ee85b04be4586a53f2d83deed55e32d9b65d
+clone-recursive = true

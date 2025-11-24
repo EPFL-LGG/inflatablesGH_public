@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Inflatables Report 8/6/2019</title>
+  <style type="text/css">
+      code{white-space: pre-wrap;}
+      span.smallcaps{font-variant: small-caps;}
+      span.underline{text-decoration: underline;}
+      div.column{display: inline-block; vertical-align: top; width: 50%;}
+  </style>
+  <link rel="stylesheet" href="icg_report.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+</head>
+<body>
+<header>
+<h1 class="title">Inflatables Report 8/6/2019</h1>
+</header>
+<p>We now have a full pipeline in place to construct an inflatable sheet for a target 3D surface and simulate its deployment. This pipeline consists of:</p>
+<ol type="1">
+<li>Parametrization: flattening the target 3D surface to the plane with a mapping that emulates the behavior of the inflating air channels.</li>
+<li>Constructing air channel walls that align well with the directions extracted from the parametrization.</li>
+<li>Simulating the inflation of these air channels.</li>
+</ol>
+<p>This report describes the algorithm for constructing air channels and then discusses some alterations to the parametrization stage <a href="4_10_2019.html#formulation" target=".blank">proposed in the last report</a> that were needed to obtain reasonable results.</p>
+<h2 id="air-channel-construction">Air Channel Construction</h2>
+<p>We take the piecewise linear parametrization <span class="math inline">\(f : \mathcal{M} \to \mathbb{R}^2\)</span> of our triangulated target surface <span class="math inline">\(\mathcal{M}\)</span> and compute the SVD of its (constant) Jacobian on each triangle, <span class="math display">\[
+    \nabla f = U
+    \begin{pmatrix}
+        \sigma_0 &amp; 0 &amp; 0 \\
+        0 &amp; \sigma_1 &amp; 0
+    \end{pmatrix}
+    V^T,
+\label{eqn:svd}\tag{1}
+\]</span> where <span class="math inline">\(U = \left({\bf u}_0\, {\bf u}_1\right)\)</span> and <span class="math inline">\(V = \left({\bf v}_0\, {\bf v}_1 \, {\bf n} \right)\)</span> are matrices holding the left and right singular vectors in their columns. The singular values are sorted in descending order, so singular vectors <span class="math inline">\({\bf u}_0\)</span> and <span class="math inline">\({\bf v}_0\)</span> are the material directions in 2D and 3D along which lengths are stretched by the flattening (<span class="math inline">\(\sigma_0 \approx \frac{\pi}{2}\)</span>). Singular vectors <span class="math inline">\({\bf u}_1\)</span> and <span class="math inline">\({\bf v}_1\)</span> are the directions along which the mapping preserves lengths (<span class="math inline">\(\sigma_1 \approx 1.0\)</span>), i.e., the implied channel orientations. Finally, the third right singular vector <span class="math inline">\({\bf n}\)</span> is the triangle’s normal.</p>
+<p>We use the algorithm from <span class="citation" data-cites="Knoppel2015">Knöppel et al. (2015)</span> to construct a stripe pattern aligned with <span class="math inline">\({\bf u}_1\)</span> (in the pane). We subdivide the flat 2D triangle mesh <span class="math inline">\(f(\mathcal{M})\)</span> to give the stripe pattern algorithm greater resolution to work with and smooth the per-triangle orientation field <span class="math inline">\({\bf u}_1\)</span> into per-vertex 2D angles as required by the algorithm (using a circular mean to average the angles). We also specify a spatial frequency, which controls the scale of the air channels (increasing this parameter packs more air channels into the sheet). The resulting stripe field is then sampled on an even finer subdivided triangle mesh.</p>
+<p>The “stripe field” is effectively a distance field to the channel wall centers in scaled/nondimensionalized units: the field is 0 at the wall center and increases at an approximately constant rate as you move perpendicularly to the wall. The field reaches a peak value of <span class="math inline">\(\pi\)</span> at the channel center before dropping back to <span class="math inline">\(0\)</span> at the next wall center (the spacing between wall centers is always <span class="math inline">\(2 \pi\)</span> in these scaled units):</p>
+<figure>
+<img src="images/stripe_field.png" alt="Figure 1: Example stripe field for the Lilium tower model." width="600" /><figcaption>Figure 1: Example stripe field for the Lilium tower model.</figcaption>
+</figure>
+<p>Recall that the channel wall width adjusts the amount of contraction induced by channel inflation. So for a given parametrization <span class="math inline">\(f\)</span>, we must choose the wall widths according to the stretch <span class="math inline">\(\sigma_0\)</span> that <span class="math inline">\(f\)</span> applies when flattening the target surface to the plane. For instance, if <span class="math inline">\(\sigma_0\)</span> is the maximum value of <span class="math inline">\(\frac{\pi}{2}\)</span>, then the walls must have zero width so that the air channels occupy the full span of <span class="math inline">\(2 \pi\)</span> units between their walls. For a general, spatially varying <span class="math inline">\(\sigma_0,\)</span> the formula for wall widths in our nondimensionalized units is: <span class="math display">\[
+w = \frac{\frac{2 \pi}{\sigma_0} - 4}{1 - \frac{2}{\pi}}.
+\]</span></p>
+<p>Subtracting this scalar field <span class="math inline">\(w\)</span> will shift the stripe field so that its zero contour curves lie at distance <span class="math inline">\(w\)</span> from the wall center. In other words, the zero contours of the shifted stripe field are now exactly where we need to draw wall boundaries; I extract these contours as polylines and then simplify them by uniformly resampling at a specified arc length increment (otherwise they are very high resolution and noisy).</p>
+<figure>
+<img src="images/extracted_walls.png" alt="Figure 2: Extracted walls for the Lilium tower model." width="600" /><figcaption>Figure 2: Extracted walls for the Lilium tower model.</figcaption>
+</figure>
+<p>Finally, I construct a Delaunay triangulation of the flattened mesh that contains these wall polylines. The triangulation library I use, <a href="https://www.cs.cmu.edu/~quake/triangle.html">Triangle</a>, can track which vertices of the output mesh originate from the input wall polylines; these wall vertices are used to fuse the top and bottom sheets together for simulation.</p>
+<h2 id="attempting-inflation">Attempting Inflation</h2>
+<p>With the inflation sheet mesh thus constructed, we can now attempt the inflation simulation to see how well the design works. Unfortunately, even if we “cheat” by forcing the sheet onto the target surface as an initialization for the equilibrium solver (lifting the mesh to 3D by applying <span class="math inline">\(f^{-1}\)</span> to its vertices), the sheet immediately pops into a very different shape:</p>
+<figure>
+<video height="400px" width="600px" onclick="this.paused ? this.play() : this.pause();" playsinline>
+<source src="videos/orig_inflation.mov" type="video/mp4">
+</video>
+<figcaption>
+Figure 3: Inflation for the air channel design from Figure 2 (click to play).
+</figcaption>
+</figure>
+<h3 id="metric-validation">Metric Validation</h3>
+This behavior is not due to a failure of the parametrization <span class="math inline">\(f\)</span> to properly encode the target shape as a new metric on 2D sheet <span class="math inline">\(D := f(\mathcal{M}) \subset \mathbb{R}^2\)</span>. In fact, we can verify that the metric encodes our shape by solving the following minimization problem for an immersion <span class="math inline">\(h : D \to \mathbb{R}^3\)</span> with the metric used to design the air channels: <span class="math display">\[
+\min_h \frac{1}{2} \int_D \! \|\nabla \mathcal{h}^T \nabla \mathcal{h} - g\|_F^2 \, \mathrm{d}A + E_\text{shell}(h),
+\label{eqn:metric_fit}\tag{2}
+\]</span> where <span class="math inline">\(g = {\bf u}_1 \otimes {\bf u}_1 + \frac{1}{\texttt{clamp}(\sigma_0)} {\bf u}_0 \otimes {\bf u}_0\)</span> is the metric taken from <span class="math inline">\(f\)</span> after clamping to the <span class="math inline">\(\sigma_0\)</span> and <span class="math inline">\(\sigma_1\)</span> values permitted by the air channel mechanism, and <span class="math inline">\(E_\text{shell}\)</span> is a bending regularization energy based on the dihedral angles between triangles introduced in <span class="citation" data-cites="Grinspun2003">Grinspun et al. (2003)</span>. Solving <span class="math inline">\((\ref{eqn:metric_fit})\)</span> reproduces the qualitative features of the Lilium tower surface (click to play):
+<figure>
+<video height="400px" width="600px" onclick="this.paused ? this.play() : this.pause();" playsinline>
+<source src="videos/metric_fitting_free_bdry.mov" type="video/mp4">
+</video>
+</figure>
+The reproduction is even better if we apply a Dirichlet boundary condition gluing the boundary <span class="math inline">\(\partial D\)</span> to the target surface’s boundary curve while solving <span class="math inline">\((\ref{eqn:metric_fit})\)</span>:
+<figure>
+<video height="400px" width="600px" onclick="this.paused ? this.play() : this.pause();" playsinline>
+<source src="videos/metric_fitting_fixed_bdry.mov" type="video/mp4">
+</video>
+</figure>
+<p>This improvement when fixing the boundary is expected since shells become much more rigid when their boundaries are constrained; if we free the boundary to deform, we can find many different shapes that are nearly isometric to the original.</p>
+Incidentally, we can use this metric fitting approach to reconstruct the theoretical shape of the <a href="4_10_2019.html#concentric-circles">concentric circles</a> design:
+<figure>
+<video height="400px" width="600px" onclick="this.paused ? this.play() : this.pause();" playsinline>
+<source src="videos/negative_cone.mov" type="video/mp4">
+</video>
+</figure>
+<p>Note that the shape has all of its Gaussian curvature concentrated at a singularity in the center, and the surface is developable away from the center (i.e., it is truly a negative cone). The inflated counterpart smoothes this negative curvature across more of the surface–and has a less extreme cone angle.</p>
+<h2 id="new-regularization-term">New Regularization Term</h2>
+<p>We can understand why the inflation fails to produce the correct shape even when the encoded metric appears to be good by studying the inflation in Figure 3 more carefully. Apparently the issue is that the long air channels spanning across the shape must bend significantly to fit to the surface, but inflation forces the tubes to straighten out. We need to modify our parametrization algorithm to consider more than just the in-plane metric-changing effects of the air channels; it must ensure the air channels bend as little as possible in their deployed configuration to mitigate the effects of straightening.</p>
+<p>To this end, we develop a “homogenized” anisotropic bending energy model to capture the reluctance of the inflated tubes to bend. We base our model on a standard bending energy used for beams and rods: <span class="math display">\[\frac{1}{2} \int \! \kappa^2 \, \mathrm{d}s,\]</span> where <span class="math inline">\(\kappa\)</span> is the curvature of the beam’s centerline. Imagine the area element <span class="math inline">\(\mathrm{d}A\)</span> at a point <span class="math inline">\({\bf x}\)</span> on our surface <span class="math inline">\(\mathcal{M}\)</span> is filled with many parallel inflated tubes all oriented in direction <span class="math inline">\({\bf v}_1\)</span> (i.e., the channel directions implied by the parametrization <span class="math inline">\(f\)</span>). Summing the bending energy over all the segments of tubes fitting inside <span class="math inline">\(\mathrm{d}A\)</span> gives us an energy proportional to <span class="math inline">\(\kappa({\bf v}_1)^2 \mathrm{d}A\)</span>, where <span class="math inline">\(\kappa({\bf v}_1)\)</span> is the normal curvature of the surface in the <span class="math inline">\({\bf v}_1\)</span> direction at this area element. This normal curvature can be written as <span class="math inline">\({\bf v}_1^T S({\bf x}) {\bf v}_1\)</span> where <span class="math inline">\(S({\bf x}) = \kappa_1 {\bf d}_1 \otimes {\bf d}_1 + \kappa_2 {\bf d}_2 \otimes {\bf d}_2\)</span> is the <em>shape operator</em> at <span class="math inline">\({\bf x}\)</span> expressed in terms of the surfaces’ principal curvatures and principal curvature directions. The total bending energy in the homogenized inflated sheet for a given direction field <span class="math inline">\(\bf{v}_1\)</span> on <span class="math inline">\(\mathcal{M}\)</span> is thus proportional to: <span class="math display">\[
+\frac{1}{4} \int_\mathcal{M} ({\bf v}_1^T S {\bf v}_1)^2 \mathrm{d}A.
+\]</span></p>
+<p>We discretize the shape operator tensor field <span class="math inline">\(S\)</span> as a matrix stored on each triangle of our target surface. For a given triangle, this matrix is the average of the three corner vertices’ shape operators, which in turn are constructed using <code>libigl</code>’s quadric-fitting-based <code>principal_cuvature</code> function.</p>
+<p>Adding this bending energy term to our original parameterization energy, we arrive at the formulation: <span class="math display">\[
+\begin{aligned}
+E[f] := &amp;\underbrace{\frac{1}{2} \int_\mathcal{M}
+                    (\sigma_1 - 1)^2 + \left(\sigma_0 - \texttt{clamp}(\sigma_0, (\alpha_\text{min}, \pi / 2))\right)^2 \mathrm{d}A
+        }_{\text{singular value fitting term}}
+      + \underbrace{
+            \frac{1}{4} \int_\mathcal{M} ({\bf v}_1^T S {\bf v}_1)^2 \mathrm{d}A
+        }_{\text{bending regularization}},
+ \\ &amp;
+      + \underbrace{
+            \frac{w_\phi}{p_\phi} \sum_{i, j} \|{\bf u}_0^i \times {\bf u}_0^j\|^{p_\phi}
+        }_{\text{direction regularization}}
+      + \underbrace{
+            \frac{w_\alpha}{p_\alpha} \sum_{i, j} |\sigma_0^i  - \sigma_0^j|^{p_\alpha}
+        }_{\text{stretch regularization}}.
+\end{aligned}
+\label{eqn:regularized}\tag{3}
+\]</span></p>
+<h3 id="results">Results</h3>
+<p>The parametrization and its derived stripe patterns/air channel walls change substantially with the new bending regularization term:</p>
+<figure>
+<img src="images/bending_aware_stripe_field.png" alt="Stripe field with bending regularization, after the shift based on stretch \sigma_0." width="600" /><figcaption>Stripe field with bending regularization, after the shift based on stretch <span class="math inline">\(\sigma_0\)</span>.</figcaption>
+</figure>
+<figure>
+<img src="images/bending_aware_extracted_walls.png" alt="Air channel walls with bending regularization. Click to download an obj file containing the wall polylines." width="600" /><figcaption>Air channel walls with bending regularization. <a href="data/lilium_bend_reg_walls.obj">Click to download an <code>obj</code> file containing the wall polylines.</a></figcaption>
+</figure>
+This design does a much better job of reproducing the qualitative features of the Lilium model. Here we show the inflation from a nearly flat state (starting from a completely flat state would make it difficult to ensure that reflectional symmetry is broken in just the right way):
+<figure>
+<video height="400px" width="600px" onclick="this.paused ? this.play() : this.pause();" playsinline>
+<source src="videos/new_inflation.mov" type="video/mp4">
+</video>
+<figcaption>
+Figure 4: Free boundary inflation for the bending regularized air channel design (click to play). See 3D viewer <a href="3d_figures/lilium_free_bdry.html" target=".blank">here</a>.
+</figcaption>
+</figure>
+<p>The result is of course better if we constrain the boundary of the inflated structure. We show the inflated design here with the target surface superimposed in translucent red. You can open a 3D viewer (drag to rotate, scroll to zoom, double click for full screen) by clicking the image:</p>
+<figure>
+<a href="3d_figures/lilium_fixed_bdry_compare.html" target=".blank"><img src="images/lilium_fixed_bdry_compare.png" alt="Figure 5: Fixed boundary inflated structure for the bending regularized air channel design." width="600" /></a>
+<figcaption>
+Figure 5: Fixed boundary inflated structure for the bending regularized air channel design (click for 3D view).
+</figcaption>
+</figure>
+<h2 id="results-from-completely-unregularized-parametrization">Results from Completely Unregularized Parametrization</h2>
+<p>Recall the unregularized parametrization formulation from <span class="citation" data-cites="aharoni">Aharoni et al. (2018)</span> and its results for the Lilium surface: <span class="math display">\[
+E[f] :=
+\min_{U, V, \alpha} \frac{1}{2} \int_\mathcal{M} \! \left\| \nabla f -
+    U
+    \begin{pmatrix}
+        \alpha &amp; 0 &amp; 0 \\
+        0 &amp; 1 &amp; 0
+    \end{pmatrix}
+    V^T
+ \right\|_F^2 \ \mathrm{d}A.
+\label{eqn:unregularized}\tag{4}
+\]</span></p>
+<p><a href="images/LocalGlobalLiliumPlot.png" target=".blank"><img src="images/LocalGlobalLiliumPlot.png" width="800" /></a></p>
+<p>I originally thought that these unregularized results were too noisy to construct walls from: my first attempts failed, giving thousands of small disconnected polygons instead of actual walls. But it turns out that, by using a much higher resolution mesh for the stripe field generation and wall extraction, I was able to generate walls after all: <img src="images/noreg_stripe_field.png" width="400" /> <img src="images/noreg_walls.png" width="400" /></p>
+<p>(<a href="data/lilium_noreg_walls.obj">Click here</a> to download an <code>obj</code> file containing the wall polylines.)</p>
+Surprisingly, these walls do a pretty good job of reproducing the surface, at least as long as we constrain the boundary:
+<figure>
+<a href="3d_figures/lilium_noreg_fixed_bdry.html" target=".blank"><img src="images/lilium_noreg_fixed_bdry_compare.png" alt="Fixed boundary inflated structure for the unregularized air channel design." width="600" /></a>
+<figcaption>
+Fixed boundary inflated structure for the unregularized air channel design (click for 3D view).
+</figcaption>
+</figure>
+If we free the boundary, the inflation deviates more from the target surface than the bending-regularized design did.
+<figure>
+<video height="400px" width="600px" onclick="this.paused ? this.play() : this.pause();" playsinline>
+<source src="videos/noreg_inflation.mov" type="video/mp4">
+</video>
+<figcaption>
+Free boundary inflation for the unregularized air channel design (click to play). <a href="3d_figures/lilium_noreg_free_bdry.html">Click here</a> for a 3D view.
+</figcaption>
+</figure>
+<h3 id="regularized-vs-unregularized">Regularized vs Unregularized</h3>
+<p>The fairly good behavior of the unregularized design (especially compared to the original smooth design in Figure 3) is apparently due to the less structured channel orientations; this makes the straightening effects of the inflated tubes less likely to accumulate to produce large changes to the shape encoded in the metric. However, we should note that the regularized optimizations (penalizing smoothness/tube bending) usually find parametrizations achieving <em>lower</em> values for the unregularized fitting energy <span class="math inline">\((\ref{eqn:unregularized})\)</span> than the local-global iteration from <span class="citation" data-cites="aharoni">Aharoni et al. (2018)</span> could. In other words, the energy <span class="math inline">\((\ref{eqn:unregularized})\)</span> does not in itself prefer unstructured designs; these are picked arbitrarily and unpredictably by the local-global iteration algorithm failing to converge to a good local optimum. If we decide we want designs with less smooth orientations than we get from <span class="math inline">\((\ref{eqn:regularized})\)</span>, we really need to formulate this goal in the optimization/design space.</p>
+<p>There are certainly issues with mostly straight/smoothly turning tubes. When they saw the design in Figure 1, Emmanuel and Benoit also expressed concerns about the straight channels being weak in bending. But there are downsides to unstructured designs too. Here are some of the pros and cons I see of the smoother bending-regularized designs found with <span class="math inline">\((\ref{eqn:regularized})\)</span>.</p>
+<p>Pros: long, straight tubes look more elegant and are easier to mesh and fabricate. Specifically, they can be meshed at a lower resolution, significantly accelerating the inflation simulation. Fine-scale zig-zag designs likely will require meshes that are too large to simulate. Having an initially smooth design probably also helps with the optimization: it is more difficult to adjust a design with many sharp turns while still respecting the fabrication constraints (bounds on the wall widths).</p>
+<p>Cons: even when picking optimal alignments for mostly straight tubes, the coherent straightening effects still accumulate to fight the curvature encoded in the metric. And for umbilic surfaces like a half-sphere, all directions are equally bad, and a zig-zag design would probably better prevent the unbending effects from accumulating.</p>
+<h2 id="designing-zig-zag-patterns">Designing Zig-zag Patterns</h2>
+<p>I think it is quite difficult to formulate a regularization term that encourages a zig-zag structure at a particular length-scale (forcing channels to turn abruptly if they have remained straight for “too long”). At least, I have not been able to come up with anything like this yet.</p>
+<p>The other approach is to design at a higher level, as originally suggested by Emmanuel and Benoit. We could take the singular vector fields <span class="math inline">\({\bf u}_0\)</span> and <span class="math inline">\({\bf u}_1\)</span> found by a smooth parametrization and use them to compute two orthogonal stripe fields, one aligned to <span class="math inline">\({\bf u}_0\)</span> as in Figure 1, and the other aligned to <span class="math inline">\({\bf u}_1\)</span>. Then we could use these two stripe fields as a periodic 2D coordinate system for placing a procedural 2D zig-zag pattern (you can view the current <a href="#air-channel-construction">air channel construction</a> procedure as using a periodic 1D coordinate function–the single stripe field–for placing the channel walls). This 2D parametrization approach is demonstrated in Figure 18 of <span class="citation" data-cites="Knoppel2015">Knöppel et al. (2015)</span>.</p>
+<h2 id="next-steps">Next Steps</h2>
+<p>Apart from possibly exploring an explicit zig-zag design approach, the next step is to run an optimization to improve the initial air channels generated from the parametrization. To do this, we need to decide what variables/representation to use for the optimization. For example, we could directly optimize the wall vertex positions with a constraint to keep the walls from inverting. Or we could try working with a smoother representation where the walls are represented by spline curves (indicating the wall centers) and thickness scalar fields defined on these curves.</p>
+<p>Regardless of the representation we choose, the optimization problem will be challenging because the total potential energy Hessian for the designs I’ve shown is either not positive definite or barely positive definite at its minimum. In other words, there are some directions we can slightly perturb the inflated vertex positions without changing the energy, so the equilibrium configuration is not unique and cannot be considered a differentiable function of the design variables. I believe this is due to the tension field theory approximation we are using for the simulation, where compressive forces are ignored.</p>
+<p>This positive definiteness issue is problematic for the optimization formulation I had in mind. I planned to express the optimization as minimizing some objective function of the inflated configuration (e.g., its distance to the target surface) with respect to the design parameters. Then each iteration of the design optimization would involve solving for the current design’s inflated equilibrium and computing derivatives of the objective function with respect to the design variables. This is the type of formulation I have used successfully in the past (e.g., for our last X-Shells Siggraph paper), but a singular or indefinite potential energy Hessian means that these inner equilibrium solves will be slow and the derivatives I compute may not be accurate.</p>
+<p>Another formulation we might try is to have a single giant optimization with both the design parameters and the inflated sheet’s deformed configuration as variables. We would minimize the same objective function as before, but we would add an nonlinear equality constraint enforcing the equilibrium. This is a more challenging/brute force and less elegant optimization problem, but it avoids the need to solve for and differentiate equilibria at each iteration. We could try using an augmented Lagrangian or SQP algorithm to solve this optimization.</p>
+<h2 id="references" class="unnumbered">References</h2>
+<div id="refs" class="references">
+<div id="ref-aharoni">
+<p>Aharoni, Hillel, Yu Xia, Xinyue Zhang, and Shu Kamien Randall D. andYang. 2018. “Universal Inverse Design of Surfaces with Thin Nematic Elastomer Sheets.” <em>Proceedings of the National Academy of Sciences of the United States of America</em> 115 (28).</p>
+</div>
+<div id="ref-Grinspun2003">
+<p>Grinspun, Eitan, Anil N. Hirani, Mathieu Desbrun, and Peter Schröder. 2003. “Discrete Shells.” In <em>Proceedings of the 2003 Acm Siggraph/Eurographics Symposium on Computer Animation</em>, 62–67. SCA ’03. Aire-la-Ville, Switzerland, Switzerland: Eurographics Association. <a href="http://dl.acm.org/citation.cfm?id=846276.846284" class="uri">http://dl.acm.org/citation.cfm?id=846276.846284</a>.</p>
+</div>
+<div id="ref-Knoppel2015">
+<p>Knöppel, Felix, Keenan Crane, Ulrich Pinkall, and Peter Schröder. 2015. “Stripe Patterns on Surfaces.” <em>ACM Trans. Graph.</em> 34 (4). New York, NY, USA: ACM: 39:1–39:11. <a href="https://doi.org/10.1145/2767000" class="uri">https://doi.org/10.1145/2767000</a>.</p>
+</div>
+</div>
+</body>
+</html>
