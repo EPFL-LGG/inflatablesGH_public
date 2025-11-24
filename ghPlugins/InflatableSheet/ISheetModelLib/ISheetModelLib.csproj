@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <Version>1.0</Version>
+    <Title>ISheetModelLib</Title>
+    <Description>Description of ISheetModelLib</Description>
+    <OutputType>Library</OutputType>
+    <RhinoPluginType>none</RhinoPluginType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RhinoCommon" Version="7.20.22193.9001" IncludeAssets="compile;build" />
+    <PackageReference Include="Grasshopper" Version="7.20.22193.9001" />
+    <PackageReference Include="Plotly.NET" Version="4.2.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Remove="Creators\" />
+    <None Remove="Types\" />
+    <None Remove="Utils\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Creators\" />
+    <Folder Include="Types\" />
+    <Folder Include="Utils\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ISheetDataLib\ISheetDatalLib.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\bin\libisheet\libisheet.dylib">
+      <Link>libisheet.dylib</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <PropertyGroup Condition="$(Configuration) == 'Debug' AND $([MSBuild]::IsOSPlatform(Windows))">
+    <StartProgram>C:\Program Files\Rhino 7\System\Rhino.exe</StartProgram>
+    <StartArguments></StartArguments>
+    <StartAction>Program</StartAction>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>..\..\..\bin\isheet</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <ExternalConsole>false</ExternalConsole>
+    <Commandlineparameters></Commandlineparameters>
+  </PropertyGroup>
+</Project>

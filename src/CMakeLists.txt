@@ -1,0 +1,5 @@
+add_library(isheet SHARED isheetGH/isheet.cc)
+target_link_libraries(isheet inflation_lib periodic_inflatable MeshFEM)
+set_target_properties(isheet PROPERTIES CXX_STANDARD 14)
+set_target_properties(isheet PROPERTIES CXX_STANDARD_REQUIRED ON)
+set_target_properties(isheet PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin/libisheet/)

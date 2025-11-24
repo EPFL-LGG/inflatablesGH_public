@@ -1,0 +1,57 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <Version>1.0</Version>
+    <Title>ISheetModel</Title>
+    <Description>Description of ISheetModel</Description>
+    <TargetExt>.gha</TargetExt>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Grasshopper" Version="7.20.22193.9001" IncludeAssets="compile;build" />
+    <PackageReference Include="RhinoCommon" Version="7.20.22193.9001" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Remove="Model\" />
+    <None Remove="Helpers\" />
+    <None Remove="Analysis\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Model\" />
+    <Folder Include="Helpers\" />
+    <Folder Include="Analysis\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ISheetModelLib\ISheetModelLib.csproj" />
+    <ProjectReference Include="..\ISheetDataLib\ISheetDatalLib.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Analysis\GraphPlotterGH.cs" />
+    <Compile Remove="Model\AttractedInflatableSheetSolverGH.cs" />
+    <Compile Remove="Model\EditInflatableModelGH.cs" />
+    <Compile Remove="Model\MultipleSheetsSolverGH.cs" />
+  </ItemGroup>
+  <PropertyGroup Condition="$(Configuration) == 'Debug' AND $([MSBuild]::IsOSPlatform(Windows))">
+    <StartProgram>C:\Program Files\Rhino 7\System\Rhino.exe</StartProgram>
+    <StartArguments></StartArguments>
+    <StartAction>Program</StartAction>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>..\..\..\bin\isheet</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CustomCommands>
+      <CustomCommands>
+        <Command>
+          <type>AfterBuild</type>
+          <command>rm -rf ${TargetDir}/cs &amp;&amp; rm -rf ${TargetDir}/de &amp;&amp; rm -rf ${TargetDir}/es &amp;&amp; rm -rf ${TargetDir}/fr &amp;&amp; rm -rf ${TargetDir}/it &amp;&amp; rm -rf ${TargetDir}/ja &amp;&amp; rm -rf ${TargetDir}/ko &amp;&amp; rm -rf ${TargetDir}/pl &amp;&amp; rm -rf ${TargetDir}/pt-BR &amp;&amp; rm -rf ${TargetDir}/ru &amp;&amp; rm -rf ${TargetDir}/tr &amp;&amp; rm -rf ${TargetDir}/zh-Hans &amp;&amp; rm -rf ${TargetDir}/zh-Hant</command>
+        </Command>
+      </CustomCommands>
+    </CustomCommands>
+  </PropertyGroup>
+</Project>

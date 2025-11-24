@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <Version>1.0</Version>
+    <Title>ISheets</Title>
+    <Description>Description of ISheets</Description>
+    <RhinoPluginType>gha</RhinoPluginType>
+    <RhinoMacLauncher>/Applications/Rhino 7.app</RhinoMacLauncher>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugType>full</DebugType>
+    <OutputPath>..\..\..\bin\isheet</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>..\..\..\bin\isheet</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Grasshopper" Version="7.20.22193.9001" IncludeAssets="compile;build" />
+    <PackageReference Include="RhinoCommon" Version="7.20.22193.9001" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Remove="RhinoCommon" />
+    <None Remove="System.Windows.Forms" />
+    <None Remove="Helpers\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Helpers\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ISheetDataLib\ISheetDatalLib.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Data\AttractedInflatableGH.cs" />
+  </ItemGroup>
+</Project>
