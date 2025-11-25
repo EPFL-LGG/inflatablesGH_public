@@ -20,8 +20,25 @@ You can install all the mandatory dependencies on macOS with [MacPorts](https://
 
 ```bash
 # Build/version control tools, C++ code dependencies
-sudo port install cmake boost ninja meson cgal4
+sudo port install cmake boost ninja meson gmp mpfr
 sudo port install SuiteSparse +accelerate
+
+# Download CGAL 4.14.3
+curl -LO https://github.com/CGAL/cgal/releases/download/releases%2FCGAL-4.14.3/CGAL-4.14.3.tar.xz
+tar xf CGAL-4.14.3.tar.xz
+cd CGAL-4.14.3
+
+# Build CGAL 4 manually
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/cgal4 \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_PREFIX_PATH="/opt/local" \
+      -DWITH_CGAL_Core=ON .
+make -j$(sysctl -n hw.logicalcpu)
+make install
+
+# Set environment variable
+export CGAL_DIR=$HOME/cgal4/lib/CGAL
+
 ```
 
 ## Obtaining and Building
