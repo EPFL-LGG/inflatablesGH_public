@@ -36,7 +36,7 @@ Build the C++ code and its Python bindings using `cmake` and your favorite
 build system. For example, with [`ninja`](https://ninja-build.org):
 
 ```bash
-cd Inflatables
+cd inflatablesGH_public
 mkdir build && cd build
 cmake .. -GNinja
 ninja
