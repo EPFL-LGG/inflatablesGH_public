@@ -208,7 +208,7 @@ if (LIBIGL_WITH_VIEWER)
 endif()
 
 add_subdirectory(wall_generation)
-add_subdirectory(python_bindings)
+#add_subdirectory(python_bindings)
 
 if(NOT TARGET Catch2::Catch2)
     meshfem_download_catch()

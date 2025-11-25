@@ -132,16 +132,16 @@ if (DEFINED ENV{PYTHON_EXECUTABLE})
 endif()
 
 # Download pybind dependency when pybind11 is missing
-if(NOT TARGET pybind11::module)
-    include(MeshFEMDownloadExternal)
-    meshfem_download_project(pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG 5b0a6fc2017fcc176545afe3e09c9f9885283242
-    )
-    add_subdirectory(${MESHFEM_EXTERNAL}/pybind11)
-endif()
+# if(NOT TARGET pybind11::module)
+#     include(MeshFEMDownloadExternal)
+#     meshfem_download_project(pybind11
+#         GIT_REPOSITORY https://github.com/pybind/pybind11.git
+#         GIT_TAG 5b0a6fc2017fcc176545afe3e09c9f9885283242
+#     )
+#     add_subdirectory(${MESHFEM_EXTERNAL}/pybind11)
+# endif()
 
-add_subdirectory(src/python_bindings)
+#add_subdirectory(src/python_bindings)
 
 if(MESHFEM_WITH_OFFSCREEN_RENDER)
     add_subdirectory(3rdparty/OffscreenRenderer)
